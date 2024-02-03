@@ -40,7 +40,7 @@ void setup() {
     DateTime now = rtc.now();
     WriteToCSV(now, SENS1, SENS2);
 
-    delay(5000);
+    delay(10000);
     ESP.restart();
 }
 
@@ -70,8 +70,8 @@ void INIT_RTC() {
 
 void WriteToCSV(DateTime timestamp, float Value1, float Value2) {
     char fileName[15];
-    snprintf(fileName, sizeof(fileName), "WS1_%02d%02d%04d.csv",
-             timestamp.day(), timestamp.month(), timestamp.year());
+    snprintf(fileName, sizeof(fileName), "WS1%02d%02d%04d.csv", timestamp.day(),
+             timestamp.month(), timestamp.year());
 
     char timeBuffer[9];
     snprintf(timeBuffer, sizeof(timeBuffer), "%02d:%02d:%02d", timestamp.hour(),
@@ -107,6 +107,8 @@ void WriteToCSV(DateTime timestamp, float Value1, float Value2) {
         myFile.close();
 
         Serial.println("Data written to file: " + String(fileName));
+        Serial.println(String(timeBuffer) + "," + String(Value1) + "," +
+                       String(Value2));
     } else {
         Serial.println("Error opening file: " + String(fileName));
     }
