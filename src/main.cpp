@@ -34,17 +34,18 @@ void setup() {
     INIT_SD();
     INIT_RTC();
 
+    // ESP.restart();
+}
+
+void loop() {
     // LOGIC
     float SENS1 = readSensor1();
     float SENS2 = readSensor2();
     DateTime now = rtc.now();
     WriteToCSV(now, SENS1, SENS2);
 
-    delay(10000);
-    ESP.restart();
+    delay(1000);
 }
-
-void loop() {}
 
 void INIT_SD() {
     Serial.print("Initializing SD card...");
@@ -58,22 +59,23 @@ void INIT_SD() {
 void INIT_RTC() {
     if (!rtc.begin()) {
         Serial.println("Couldn't find RTC");
-        while (1)
+        while (1) {
             ;
+        }
     }
 
     if (!rtc.isrunning()) {
         Serial.println("RTC is not running! Setting the time.");
-        rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+        // rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
     }
 }
 
 void WriteToCSV(DateTime timestamp, float Value1, float Value2) {
-    char fileName[15];
-    snprintf(fileName, sizeof(fileName), "WS1%02d%02d%04d.csv", timestamp.day(),
-             timestamp.month(), timestamp.year());
+    char fileName[25];
+    sprintf(fileName, "WS1_%02d%02d%04d.csv", timestamp.day(),
+            timestamp.month(), timestamp.year());
 
-    char timeBuffer[9];
+    char timeBuffer[20];
     snprintf(timeBuffer, sizeof(timeBuffer), "%02d:%02d:%02d", timestamp.hour(),
              timestamp.minute(), timestamp.second());
 
@@ -84,7 +86,7 @@ void WriteToCSV(DateTime timestamp, float Value1, float Value2) {
 
         if (myFile) {
             // Write header to the file (assuming CSV header format)
-            myFile.println("Timestamp,SensorValue1,SensorValue2");
+            myFile.println("Timestamp;SensorValue1;SensorValue2");
             myFile.close();
             Serial.println("Header written to file: " + String(fileName));
         } else {
@@ -94,21 +96,17 @@ void WriteToCSV(DateTime timestamp, float Value1, float Value2) {
     }
 
     // Open the file for appending data
-    myFile = SD.open(fileName, FILE_APPEND);
+    myFile = SD.open(fileName, FILE_WRITE);
 
     if (myFile) {
+        String data =
+            String(timeBuffer) + ";" + String(Value1) + ";" + String(Value2);
+        data.replace(".", ",");
         // Write sensor data to the file
-        myFile.print(timeBuffer);
-        myFile.print(",");
-        myFile.print(Value1);
-        myFile.print(",");
-        myFile.println(Value2);
-
+        myFile.println(data);
         myFile.close();
-
         Serial.println("Data written to file: " + String(fileName));
-        Serial.println(String(timeBuffer) + "," + String(Value1) + "," +
-                       String(Value2));
+        Serial.println(data);
     } else {
         Serial.println("Error opening file: " + String(fileName));
     }
