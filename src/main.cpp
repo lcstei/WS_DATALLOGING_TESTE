@@ -16,12 +16,33 @@ FsFile myFile;
 #define SD_CS_PIN 5
 #define SD_CONFIG SdSpiConfig(SD_CS_PIN, DEDICATED_SPI, SD_SCK_MHZ(15))
 
+// Station config
+#include <Adafruit_AM2320.h>
+#include <BME280.h>
+#include <BME280I2C.h>
+#include <EnvironmentCalculations.h>
+#include <Wire.h>
+
+#include "esp_sleep.h"
+
+Adafruit_AM2320 am2320 = Adafruit_AM2320();
+BME280I2C bme;
+// Variables used in reading temp,pressure and humidity (BME280)
+float temperature, humidity, pressure;
+// variaveis do AM2320
+float temp_2320, humidity_2320;
+
+uint64_t UpdateInterval =
+    1 * 60 * 1000000;  // e.g. 0.33 * 60 * 1000000; // Sleep time
+RTC_DATA_ATTR int bootCount = 0;
+
 // DECLARATIONS
-void WriteToCSV(DateTime, float, float);
+void WriteToCSV(DateTime, float, float, float, float, float);
 void INIT_SD();
 void INIT_RTC();
-float readSensor1();
-float readSensor2();
+void Deep_Sleep_Now();
+void readdata();
+void printdata();
 
 void setup() {
     // Open serial communications and wait for port to open:
@@ -30,28 +51,41 @@ void setup() {
         ;  // wait for serial port to connect. Needed for native USB port only
     }
 
+    ++bootCount;
+
     // INITIALIZES
     INIT_SD();
     INIT_RTC();
-
-    // ESP.restart();
 }
 
 void loop() {
     // LOGIC
-    float SENS1 = readSensor1();
-    float SENS2 = readSensor2();
-    DateTime now = rtc.now();
-    WriteToCSV(now, SENS1, SENS2);
+    delay(2000);
+    readdata();
+    printdata();
 
-    delay(1000);
+    DateTime now = rtc.now();
+
+    WriteToCSV(now, temperature, humidity, pressure / 100, temp_2320,
+               humidity_2320);
+
+    float wake_time = (float)millis() /
+                      float(1000);  // Find out how long since the ESP rebooted
+
+    Serial.print("Wake Time = ");
+    Serial.print(wake_time);
+    Serial.println(" seconds");
+
+    delay(100);
+
+    Deep_Sleep_Now();
 }
 
 void INIT_SD() {
     Serial.print("Initializing SD card...");
     if (!SD.begin(SD_CONFIG)) {
         SD.initErrorPrint(&Serial);
-        ESP.restart();
+        Deep_Sleep_Now();
     }
     Serial.println("initialization done.");
 }
@@ -59,6 +93,7 @@ void INIT_SD() {
 void INIT_RTC() {
     if (!rtc.begin()) {
         Serial.println("Couldn't find RTC");
+        Deep_Sleep_Now();
         while (1) {
             ;
         }
@@ -70,7 +105,8 @@ void INIT_RTC() {
     }
 }
 
-void WriteToCSV(DateTime timestamp, float Value1, float Value2) {
+void WriteToCSV(DateTime timestamp, float temp, float humi, float press,
+                float tmp_2320, float humi_2320) {
     char fileName[25];
     sprintf(fileName, "WS1_%02d%02d%04d.csv", timestamp.day(),
             timestamp.month(), timestamp.year());
@@ -86,7 +122,9 @@ void WriteToCSV(DateTime timestamp, float Value1, float Value2) {
 
         if (myFile) {
             // Write header to the file (assuming CSV header format)
-            myFile.println("Timestamp;SensorValue1;SensorValue2");
+            myFile.println(
+                "Timestamp;temperature;humidity;pressure;temp_2320;humidity_"
+                "2320");
             myFile.close();
             Serial.println("Header written to file: " + String(fileName));
         } else {
@@ -99,8 +137,9 @@ void WriteToCSV(DateTime timestamp, float Value1, float Value2) {
     myFile = SD.open(fileName, FILE_WRITE);
 
     if (myFile) {
-        String data =
-            String(timeBuffer) + ";" + String(Value1) + ";" + String(Value2);
+        String data = String(timeBuffer) + ";" + String(temp) + ";" +
+                      String(humi) + ";" + String(press) + ";" +
+                      String(tmp_2320) + ";" + String(humi_2320);
         data.replace(".", ",");
         // Write sensor data to the file
         myFile.println(data);
@@ -112,12 +151,37 @@ void WriteToCSV(DateTime timestamp, float Value1, float Value2) {
     }
 }
 
-float readSensor1() {
-    // Replace this with the code to read sensor 1
-    return random(0, 100);
+void Deep_Sleep_Now() {
+    esp_sleep_enable_timer_wakeup(UpdateInterval);
+    Serial.println("ESP is tired, going to sleep.");
+    Serial.flush();
+    esp_deep_sleep_start();
+
+    delay(2000);
 }
 
-float readSensor2() {
-    // Replace this with the code to read sensor 2
-    return random(50, 150);
+void printdata() {
+    // printa os dados do BME280
+    Serial.print("Air temperature [°C]: ");
+    Serial.println(temperature);
+    Serial.print("Humidity [%]: ");
+    Serial.println(int(humidity));
+    Serial.print("Barometric pressure [hPa]: ");
+    Serial.println(pressure / 100);
+    delay(1000);
+    Serial.print("AM2320 temperature [C]: ");
+    Serial.println(temp_2320);
+    Serial.print("AM2320 Humidity [%]: ");
+    Serial.println(humidity_2320);
+}
+
+void readdata() {
+    // Reading BME280 sensor
+    bme.read(pressure, temperature, humidity, BME280::TempUnit_Celsius,
+             BME280::PresUnit_Pa);
+
+    // Reading AM2320 Sensor
+
+    temp_2320 = am2320.readTemperature();
+    humidity_2320 = am2320.readHumidity();
 }
