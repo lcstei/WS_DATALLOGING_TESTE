@@ -33,7 +33,7 @@ float temperature, humidity, pressure;
 float temp_2320, humidity_2320;
 
 uint64_t UpdateInterval =
-    1 * 60 * 1000000;  // e.g. 0.33 * 60 * 1000000; // Sleep time
+    5 * 60 * 1000000;  // e.g. 0.33 * 60 * 1000000; // Sleep time
 RTC_DATA_ATTR int bootCount = 0;
 
 // DECLARATIONS
@@ -110,7 +110,7 @@ void WriteToCSV(DateTime timestamp, float temp, float humi, float press,
     char fileName[25];
     sprintf(fileName, "WS1_%02d%02d%04d.csv", timestamp.day(),
             timestamp.month(), timestamp.year());
-
+    Serial.println(fileName);
     char timeBuffer[20];
     snprintf(timeBuffer, sizeof(timeBuffer), "%02d:%02d:%02d", timestamp.hour(),
              timestamp.minute(), timestamp.second());
