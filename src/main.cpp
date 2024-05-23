@@ -17,23 +17,29 @@ FsFile myFile;
 #define SD_CONFIG SdSpiConfig(SD_CS_PIN, DEDICATED_SPI, SD_SCK_MHZ(15))
 
 // Station config
+#include <Adafruit_Sensor.h>
 #include <Adafruit_AM2320.h>
 #include <BME280.h>
 #include <BME280I2C.h>
 #include <EnvironmentCalculations.h>
 #include <Wire.h>
-
 #include "esp_sleep.h"
+
+#define BME_SDA 21  // Replace with your SDA pin
+#define BME_SCL 22  // Replace with your SCL pin
 
 Adafruit_AM2320 am2320 = Adafruit_AM2320();
 BME280I2C bme;
 // Variables used in reading temp,pressure and humidity (BME280)
-float temperature, humidity, pressure;
+float bme_temperature, bme_humidity, bme_pressure;
 // variaveis do AM2320
 float temp_2320, humidity_2320;
 
+float VBAT;
+#define VBAT_PIN 33
+
 uint64_t UpdateInterval =
-    5 * 60 * 1000000;  // e.g. 0.33 * 60 * 1000000; // Sleep time
+    1 * 30 * 1000000;  // e.g. 0.33 * 60 * 1000000; // Sleep time
 RTC_DATA_ATTR int bootCount = 0;
 
 // DECLARATIONS
@@ -50,24 +56,27 @@ void setup() {
     while (!Serial) {
         ;  // wait for serial port to connect. Needed for native USB port only
     }
-
+    pinMode(VBAT_PIN, INPUT);
     ++bootCount;
 
     // INITIALIZES
-    INIT_SD();
-    INIT_RTC();
+    // INIT_SD();
+    // INIT_RTC();
 }
 
 void loop() {
+    Wire.begin();
     // LOGIC
     delay(2000);
     readdata();
     printdata();
+    // VBAT = map(analogRead(VBAT_PIN), 0, 4094, 0, 3.7);
+    Serial.println();
+    Serial.println(VBAT);
+    // DateTime now = rtc.now();
 
-    DateTime now = rtc.now();
-
-    WriteToCSV(now, temperature, humidity, pressure / 100, temp_2320,
-               humidity_2320);
+    // WriteToCSV(now, temperature, humidity, pressure / 100, temp_2320,
+    //            humidity_2320);
 
     float wake_time = (float)millis() /
                       float(1000);  // Find out how long since the ESP rebooted
@@ -163,11 +172,11 @@ void Deep_Sleep_Now() {
 void printdata() {
     // printa os dados do BME280
     Serial.print("Air temperature [°C]: ");
-    Serial.println(temperature);
+    Serial.println(bme_temperature);
     Serial.print("Humidity [%]: ");
-    Serial.println(int(humidity));
+    Serial.println(int(bme_humidity));
     Serial.print("Barometric pressure [hPa]: ");
-    Serial.println(pressure / 100);
+    Serial.println(bme_pressure);
     delay(1000);
     Serial.print("AM2320 temperature [C]: ");
     Serial.println(temp_2320);
@@ -177,9 +186,8 @@ void printdata() {
 
 void readdata() {
     // Reading BME280 sensor
-    bme.read(pressure, temperature, humidity, BME280::TempUnit_Celsius,
+    bme.read(bme_pressure, bme_temperature, bme_humidity, BME280::TempUnit_Celsius,
              BME280::PresUnit_Pa);
-
     // Reading AM2320 Sensor
 
     temp_2320 = am2320.readTemperature();
